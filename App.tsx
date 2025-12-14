@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { checkHasApiKey, promptSelectApiKey, generateImageContent } from './services/gemini';
 import ImageUploader from './components/ImageUploader';
 import { GeneratedResult } from './types';
-import { Sparkles, Zap, Image as ImageIcon, Loader2, AlertCircle, Info, ExternalLink, Monitor, Smartphone, Square, Scale, Maximize2 } from 'lucide-react';
+import { Sparkles, Zap, Image as ImageIcon, Loader2, AlertCircle, Info, ExternalLink, Monitor, Smartphone, Square, Scale, Maximize2, Download, HelpCircle, X, ShieldCheck } from 'lucide-react';
 
 const App: React.FC = () => {
   // State for API Key
@@ -24,9 +24,24 @@ const App: React.FC = () => {
   const [result, setResult] = useState<GeneratedResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // State for Installation
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallHelp, setShowInstallHelp] = useState<boolean>(false);
+
   useEffect(() => {
     // Initial check for API key
     checkHasApiKey().then(setHasKey);
+
+    // Listen for PWA install prompt
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
 
   const handleConnect = async () => {
@@ -37,6 +52,16 @@ const App: React.FC = () => {
       setHasKey(selected);
     } catch (e) {
       console.error("Failed to select key", e);
+    }
+  };
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
     }
   };
 
@@ -72,49 +97,7 @@ const App: React.FC = () => {
   };
 
   // --------------------------------------------------------------------------
-  // API Key Connection Screen
-  // --------------------------------------------------------------------------
-  if (!hasKey) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-        {/* Abstract Background */}
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[100px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[100px]" />
-
-        <div className="max-w-md w-full bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl p-8 shadow-2xl z-10 text-center">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/20">
-            <Sparkles className="text-white w-8 h-8" />
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Gemini 3 Pro Imagine</h1>
-          <p className="text-slate-400 mb-8 leading-relaxed">
-            Create stunning visuals with consistent characters and styles using the latest Gemini 3 Pro Image model.
-          </p>
-          
-          <button 
-            onClick={handleConnect}
-            className="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-blue-500/25 flex items-center justify-center gap-2 group"
-          >
-            Connect Google Cloud Project
-            <Zap size={18} className="group-hover:scale-110 transition-transform" />
-          </button>
-          
-          <div className="mt-6 flex items-start gap-2 text-xs text-left text-slate-500 bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-             <Info size={16} className="shrink-0 mt-0.5" />
-             <p>
-               This app uses the <strong>gemini-3-pro-image-preview</strong> model. 
-               Usage requires a paid Google Cloud Project connected via AI Studio. 
-               <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline ml-1 inline-flex items-center">
-                 Billing Info <ExternalLink size={10} className="ml-0.5" />
-               </a>
-             </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --------------------------------------------------------------------------
-  // Main App Screen
+  // Main App Screen (Direct Entry)
   // --------------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
@@ -122,15 +105,50 @@ const App: React.FC = () => {
       <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto h-full px-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
                     <Sparkles className="text-white w-5 h-5" />
                 </div>
-                <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400 hidden sm:block">
                     Gemini 3 Pro Imagine
                 </h1>
+                <h1 className="text-lg font-bold text-white sm:hidden">Imagine</h1>
             </div>
-            <div className="text-xs font-mono text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded border border-emerald-400/20">
-                API Connected
+            
+            <div className="flex items-center gap-3">
+                 {/* Install Button */}
+                 {deferredPrompt ? (
+                    <button 
+                        onClick={handleInstallClick} 
+                        className="hidden md:flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-all border border-slate-700"
+                    >
+                        <Download size={16} /> <span className="hidden lg:inline">Install App</span>
+                    </button>
+                 ) : (
+                    <button 
+                        onClick={() => setShowInstallHelp(true)} 
+                        className="hidden md:flex items-center gap-1 text-slate-400 hover:text-white transition-colors p-2"
+                        title="Installation Help"
+                    >
+                        <HelpCircle size={18} />
+                    </button>
+                 )}
+
+                 {/* API Connection Button */}
+                 {!hasKey ? (
+                    <button
+                        onClick={handleConnect}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-all shadow-lg hover:shadow-blue-500/25 border border-blue-400/20 animate-pulse"
+                    >
+                        <Zap size={16} className="fill-white" />
+                        <span className="hidden sm:inline">Connect Account</span>
+                        <span className="sm:hidden">Connect</span>
+                    </button>
+                 ) : (
+                    <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-400 bg-emerald-400/10 px-2.5 py-1.5 rounded-lg border border-emerald-400/20 cursor-help" title="Connected to Google Cloud">
+                        <ShieldCheck size={14} />
+                        <span className="hidden md:inline">API Active</span>
+                    </div>
+                 )}
             </div>
         </div>
       </header>
@@ -165,6 +183,27 @@ const App: React.FC = () => {
             </div>
 
             <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col gap-4 flex-1">
+                
+                {/* Not Connected Warning Banner */}
+                {!hasKey && (
+                     <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
+                         <div className="flex items-start gap-3">
+                             <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400 shrink-0">
+                                 <Info size={18} />
+                             </div>
+                             <div className="text-sm">
+                                 <p className="text-blue-100 font-bold">Connect to Start</p>
+                                 <p className="text-blue-300/80 text-xs leading-relaxed">
+                                     Link your Google Cloud project to use the Gemini 3 Pro model.
+                                     <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 ml-1 inline-flex items-center hover:underline">
+                                         Billing Info <ExternalLink size={10} className="ml-0.5" />
+                                     </a>
+                                 </p>
+                             </div>
+                         </div>
+                     </div>
+                )}
+
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                         <Zap className="text-purple-400" size={20}/>
@@ -251,10 +290,10 @@ const App: React.FC = () => {
 
                 <button
                     onClick={handleRun}
-                    disabled={loading || (!prompt && !characterFile && !referenceFile)}
+                    disabled={loading || (hasKey && !prompt && !characterFile && !referenceFile)}
                     className={`
                         py-4 px-6 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition-all
-                        ${loading || (!prompt && !characterFile && !referenceFile)
+                        ${loading || (hasKey && !prompt && !characterFile && !referenceFile)
                             ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
                             : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white hover:scale-[1.02] shadow-blue-500/25'}
                     `}
@@ -263,6 +302,11 @@ const App: React.FC = () => {
                         <>
                             <Loader2 className="animate-spin" />
                             Thinking...
+                        </>
+                    ) : !hasKey ? (
+                        <>
+                            <Zap className="fill-current" />
+                            Connect & Run
                         </>
                     ) : (
                         <>
@@ -346,6 +390,51 @@ const App: React.FC = () => {
             )}
         </section>
       </main>
+      
+        {/* Install Help Modal */}
+        {showInstallHelp && (
+            <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowInstallHelp(false)}>
+                <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-sm w-full relative shadow-2xl animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setShowInstallHelp(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"><X size={20}/></button>
+                    
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Download size={20} className="text-blue-400"/> 
+                        Install App
+                    </h3>
+                    
+                    <div className="space-y-4 text-slate-300 text-sm">
+                        <p>This app can be installed to your home screen or desktop for instant access.</p>
+                        
+                        <div className="bg-slate-950 p-4 rounded-lg border border-slate-800">
+                            <p className="font-semibold text-white mb-2 text-xs uppercase tracking-wider">Instructions</p>
+                            <ul className="list-disc pl-4 space-y-2 text-slate-400">
+                                <li>
+                                    <strong className="text-slate-200">Desktop (Chrome/Edge):</strong><br/> 
+                                    Click the install icon <Download size={12} className="inline"/> in the address bar (top right).
+                                </li>
+                                <li>
+                                    <strong className="text-slate-200">iPhone (Safari):</strong><br/> 
+                                    Tap <strong>Share</strong> (bottom center) → Scroll down → <strong>Add to Home Screen</strong>.
+                                </li>
+                                <li>
+                                    <strong className="text-slate-200">Android (Chrome):</strong><br/> 
+                                    Tap <strong>Menu (⋮)</strong> → <strong>Install App</strong> or <strong>Add to Home screen</strong>.
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <div className="flex items-start gap-2 text-xs text-yellow-500 bg-yellow-900/10 p-2 rounded border border-yellow-900/30">
+                            <Info size={14} className="shrink-0 mt-0.5" />
+                            <p>If you don't see these options, make sure you have opened this page in a <strong>new full browser tab</strong>.</p>
+                        </div>
+                    </div>
+                    
+                    <button onClick={() => setShowInstallHelp(false)} className="w-full mt-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors">
+                        Got it
+                    </button>
+                </div>
+            </div>
+        )}
     </div>
   );
 };
