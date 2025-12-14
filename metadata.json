@@ -1,0 +1,5 @@
+{
+  "name": "Gemini 3 Pro Imagine",
+  "description": "A powerful image generation tool using Gemini 3 Pro. Upload character and style references to create stunning, consistent visuals.",
+  "requestFramePermissions": []
+}
