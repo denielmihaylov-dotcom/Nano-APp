@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { checkHasApiKey, promptSelectApiKey, generateImageContent } from './services/gemini';
+import { generateImageContent } from './services/gemini';
 import ImageUploader from './components/ImageUploader';
 import { GeneratedResult } from './types';
-import { Sparkles, Zap, Image as ImageIcon, Loader2, AlertCircle, Info, ExternalLink, Monitor, Smartphone, Square, Scale, Maximize2, Download, HelpCircle, X, ShieldCheck } from 'lucide-react';
+import { Sparkles, Zap, Image as ImageIcon, Loader2, AlertCircle, Info, ExternalLink, Monitor, Smartphone, Square, Scale, Maximize2, Download, HelpCircle, X, ShieldCheck, Key, Eye, EyeOff, Save } from 'lucide-react';
 
 const App: React.FC = () => {
   // State for API Key
-  const [hasKey, setHasKey] = useState<boolean>(false);
+  const [apiKey, setApiKey] = useState<string>("");
+  const [showKeyModal, setShowKeyModal] = useState<boolean>(false);
   
   // State for Inputs
   const [characterFile, setCharacterFile] = useState<File | null>(null);
@@ -28,9 +29,19 @@ const App: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallHelp, setShowInstallHelp] = useState<boolean>(false);
 
+  // Temp state for key input
+  const [tempKey, setTempKey] = useState<string>("");
+  const [showKey, setShowKey] = useState<boolean>(false);
+
   useEffect(() => {
-    // Initial check for API key
-    checkHasApiKey().then(setHasKey);
+    // Check localStorage for key
+    const storedKey = localStorage.getItem('gemini_api_key');
+    if (storedKey) {
+        setApiKey(storedKey);
+    } else {
+        // If no key found, prompt user
+        setShowKeyModal(true);
+    }
 
     // Listen for PWA install prompt
     const handleBeforeInstallPrompt = (e: any) => {
@@ -44,15 +55,18 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const handleConnect = async () => {
-    try {
-      await promptSelectApiKey();
-      // Assume success if no error thrown, check again
-      const selected = await checkHasApiKey();
-      setHasKey(selected);
-    } catch (e) {
-      console.error("Failed to select key", e);
-    }
+  const handleSaveKey = () => {
+      if (tempKey.trim()) {
+          setApiKey(tempKey.trim());
+          localStorage.setItem('gemini_api_key', tempKey.trim());
+          setShowKeyModal(false);
+          setTempKey("");
+      }
+  };
+
+  const handleOpenKeyModal = () => {
+      setTempKey(apiKey);
+      setShowKeyModal(true);
   };
 
   const handleInstallClick = async () => {
@@ -66,8 +80,8 @@ const App: React.FC = () => {
   };
 
   const handleRun = async () => {
-    if (!hasKey) {
-        await handleConnect();
+    if (!apiKey) {
+        setShowKeyModal(true);
         return;
     }
 
@@ -76,7 +90,7 @@ const App: React.FC = () => {
     setResult(null);
 
     try {
-      const genResult = await generateImageContent(prompt, characterFile, referenceFile, aspectRatio, resolution);
+      const genResult = await generateImageContent(apiKey, prompt, characterFile, referenceFile, aspectRatio, resolution);
       setResult(genResult);
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred during generation.");
@@ -134,20 +148,24 @@ const App: React.FC = () => {
                  )}
 
                  {/* API Connection Button */}
-                 {!hasKey ? (
+                 {!apiKey ? (
                     <button
-                        onClick={handleConnect}
+                        onClick={handleOpenKeyModal}
                         className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-all shadow-lg hover:shadow-blue-500/25 border border-blue-400/20 animate-pulse"
                     >
-                        <Zap size={16} className="fill-white" />
-                        <span className="hidden sm:inline">Connect Account</span>
-                        <span className="sm:hidden">Connect</span>
+                        <Key size={16} className="fill-white" />
+                        <span className="hidden sm:inline">Put your API key</span>
+                        <span className="sm:hidden">Key</span>
                     </button>
                  ) : (
-                    <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-400 bg-emerald-400/10 px-2.5 py-1.5 rounded-lg border border-emerald-400/20 cursor-help" title="Connected to Google Cloud">
+                    <button 
+                        onClick={handleOpenKeyModal}
+                        className="flex items-center gap-1.5 text-xs font-mono text-emerald-400 bg-emerald-400/10 px-2.5 py-1.5 rounded-lg border border-emerald-400/20 hover:bg-emerald-400/20 transition-colors" 
+                        title="Change API Key"
+                    >
                         <ShieldCheck size={14} />
-                        <span className="hidden md:inline">API Active</span>
-                    </div>
+                        <span className="hidden md:inline">API Key Set</span>
+                    </button>
                  )}
             </div>
         </div>
@@ -185,19 +203,16 @@ const App: React.FC = () => {
             <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col gap-4 flex-1">
                 
                 {/* Not Connected Warning Banner */}
-                {!hasKey && (
-                     <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
+                {!apiKey && (
+                     <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2 cursor-pointer hover:bg-blue-900/30 transition-colors" onClick={handleOpenKeyModal}>
                          <div className="flex items-start gap-3">
                              <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400 shrink-0">
-                                 <Info size={18} />
+                                 <Key size={18} />
                              </div>
                              <div className="text-sm">
-                                 <p className="text-blue-100 font-bold">Connect to Start</p>
+                                 <p className="text-blue-100 font-bold">API Key Required</p>
                                  <p className="text-blue-300/80 text-xs leading-relaxed">
-                                     Link your Google Cloud project to use the Gemini 3 Pro model.
-                                     <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 ml-1 inline-flex items-center hover:underline">
-                                         Billing Info <ExternalLink size={10} className="ml-0.5" />
-                                     </a>
+                                     Click here to enter your Gemini API key to start generating.
                                  </p>
                              </div>
                          </div>
@@ -290,10 +305,10 @@ const App: React.FC = () => {
 
                 <button
                     onClick={handleRun}
-                    disabled={loading || (hasKey && !prompt && !characterFile && !referenceFile)}
+                    disabled={loading || (!!apiKey && !prompt && !characterFile && !referenceFile)}
                     className={`
                         py-4 px-6 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition-all
-                        ${loading || (hasKey && !prompt && !characterFile && !referenceFile)
+                        ${loading || (!!apiKey && !prompt && !characterFile && !referenceFile)
                             ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
                             : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white hover:scale-[1.02] shadow-blue-500/25'}
                     `}
@@ -303,10 +318,10 @@ const App: React.FC = () => {
                             <Loader2 className="animate-spin" />
                             Thinking...
                         </>
-                    ) : !hasKey ? (
+                    ) : !apiKey ? (
                         <>
-                            <Zap className="fill-current" />
-                            Connect & Run
+                            <Key className="fill-current" />
+                            Enter API Key
                         </>
                     ) : (
                         <>
@@ -432,6 +447,68 @@ const App: React.FC = () => {
                     <button onClick={() => setShowInstallHelp(false)} className="w-full mt-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors">
                         Got it
                     </button>
+                </div>
+            </div>
+        )}
+
+        {/* API Key Modal */}
+        {showKeyModal && (
+            <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowKeyModal(false)}>
+                <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-md w-full relative shadow-2xl animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setShowKeyModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"><X size={20}/></button>
+                    
+                    <div className="flex flex-col items-center mb-6">
+                        <div className="w-12 h-12 bg-blue-600/20 rounded-full flex items-center justify-center mb-3 text-blue-400">
+                            <Key size={24} />
+                        </div>
+                        <h3 className="text-2xl font-bold text-white">Enter API Key</h3>
+                        <p className="text-slate-400 text-center text-sm mt-1">
+                            To use the Gemini 3 Pro model, you need to provide your own API key.
+                        </p>
+                    </div>
+                    
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                             <div className="relative">
+                                <input 
+                                    type={showKey ? "text" : "password"} 
+                                    value={tempKey}
+                                    onChange={(e) => setTempKey(e.target.value)}
+                                    placeholder="AIzaSy..."
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 pl-4 pr-12 text-slate-100 placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-mono text-sm"
+                                />
+                                <button 
+                                    onClick={() => setShowKey(!showKey)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1"
+                                >
+                                    {showKey ? <EyeOff size={16}/> : <Eye size={16}/>}
+                                </button>
+                             </div>
+                             <p className="text-xs text-slate-500 text-center">
+                                Don't have a key? 
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 ml-1 inline-flex items-center hover:underline">
+                                    Get one here <ExternalLink size={10} className="ml-0.5" />
+                                </a>
+                             </p>
+                        </div>
+                        
+                        <div className="bg-slate-800/50 rounded-lg p-3 text-xs text-slate-400 border border-slate-700/50">
+                            <p className="flex items-center gap-2 mb-1 text-slate-300 font-medium">
+                                <ShieldCheck size={12} className="text-emerald-500" />
+                                Secure Storage
+                            </p>
+                            Your key is stored locally in your browser and sent directly to Google's servers. It is never shared with us.
+                        </div>
+
+                        <button 
+                            onClick={handleSaveKey}
+                            disabled={!tempKey.trim()}
+                            className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+                        >
+                            <Save size={18} />
+                            Save Key
+                        </button>
+                    </div>
                 </div>
             </div>
         )}

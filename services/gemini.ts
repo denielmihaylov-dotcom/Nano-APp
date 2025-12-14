@@ -19,22 +19,8 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-export const checkHasApiKey = async (): Promise<boolean> => {
-  if (window.aistudio && window.aistudio.hasSelectedApiKey) {
-    return await window.aistudio.hasSelectedApiKey();
-  }
-  return false;
-};
-
-export const promptSelectApiKey = async (): Promise<void> => {
-  if (window.aistudio && window.aistudio.openSelectKey) {
-    await window.aistudio.openSelectKey();
-  } else {
-    console.warn("AI Studio API is not available in this environment.");
-  }
-};
-
 export const generateImageContent = async (
+  apiKey: string,
   prompt: string,
   characterFile: File | null,
   referenceFile: File | null,
@@ -42,8 +28,12 @@ export const generateImageContent = async (
   resolution: string = "1K"
 ): Promise<GeneratedResult> => {
   
-  // Always create a new instance to get the latest injected key
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please enter your Gemini API Key.");
+  }
+
+  // Use the provided API Key
+  const ai = new GoogleGenAI({ apiKey: apiKey });
   
   const parts: any[] = [];
 
